@@ -6,6 +6,7 @@
 
 #define GLUT_KEY_ESCAPE 27
 #define DEG2RAD(a) (a * 0.0174532925f)
+#define RAD2DEG(a) (a * 57.2957795f)
 
 // =========================
 // Basic math & Camera (from Lab 6, extended)
@@ -618,12 +619,6 @@ void clampDiverToWorld() {
     diver.pos.y = clampf(diver.pos.y, GROUND_Y, MAX_HEIGHT);
 
     diver.onGround = (fabs(diver.pos.y - GROUND_Y) < 0.001f);
-    if (diver.onGround) {
-        diver.rotX = 0.0f;      // standing upright on floor
-    }
-    else {
-        diver.rotX = 25.0f;     // fixed forward tilt when swimming
-    }
 }
 
 void checkGoalCollision() {
@@ -635,6 +630,32 @@ void checkGoalCollision() {
             gameState = GAME_WIN;
         }
     }
+}
+
+// Handle diver translation plus required rotations
+void moveDiver(float dx, float dy, float dz) {
+    bool wasOnGround = diver.onGround;
+
+    diver.pos.x += dx;
+    diver.pos.y += dy;
+    diver.pos.z += dz;
+
+    // Update yaw if there is horizontal movement
+    if (fabs(dx) > 0.0001f || fabs(dz) > 0.0001f) {
+        diver.rotY = RAD2DEG(atan2f(-dx, dz));
+    }
+
+    clampDiverToWorld();
+
+    // Ground/air tilt rules
+    if (diver.onGround) {
+        diver.rotX = 0.0f;
+    }
+    else if (wasOnGround && !diver.onGround) {
+        diver.rotX = 25.0f;
+    }
+
+    checkGoalCollision();
 }
 
 // =========================
@@ -742,36 +763,25 @@ void Keyboard(unsigned char key, int x, int y) {
     // Game controls only when playing
     if (gameState == GAME_PLAYING) {
         float step = 0.2f;
-        bool moved = false;
 
         // Diver movement (movement keys also define facing)
         if (key == 'i') { // swim forward (+z)
-            diver.pos.z += step;
-            diver.rotY = 0.0f;
-            moved = true;
+            moveDiver(0.0f, 0.0f, step);
         }
         else if (key == 'k') { // swim backward (-z)
-            diver.pos.z -= step;
-            diver.rotY = 180.0f;
-            moved = true;
+            moveDiver(0.0f, 0.0f, -step);
         }
         else if (key == 'j') { // left (-x)
-            diver.pos.x -= step;
-            diver.rotY = 90.0f;
-            moved = true;
+            moveDiver(-step, 0.0f, 0.0f);
         }
         else if (key == 'l') { // right (+x)
-            diver.pos.x += step;
-            diver.rotY = -90.0f;
-            moved = true;
+            moveDiver(step, 0.0f, 0.0f);
         }
         else if (key == 'u') { // up (+y)
-            diver.pos.y += step;
-            moved = true;
+            moveDiver(0.0f, step, 0.0f);
         }
         else if (key == 'o') { // down (-y)
-            diver.pos.y -= step;
-            moved = true;
+            moveDiver(0.0f, -step, 0.0f);
         }
 
         // Toggle environment animations (z, x, c, v, b)
@@ -806,11 +816,6 @@ void Keyboard(unsigned char key, int x, int y) {
             camera.eye = Vector3f(0.0f, 15.0f, 0.01f);
             camera.center = Vector3f(0.0f, 0.0f, 0.0f);
             camera.up = Vector3f(0.0f, 0.0f, -1.0f);
-        }
-
-        if (moved) {
-            clampDiverToWorld();
-            checkGoalCollision();
         }
     }
 
